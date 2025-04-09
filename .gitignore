@@ -4,9 +4,6 @@
 # Environment variables
 .env
 
-# Database
-database.sqlite
-
 # Logs
 logs
 *.log
