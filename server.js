@@ -16,7 +16,7 @@ const HOST = '0.0.0.0'; // Listen on all network interfaces
 const corsOptions = {
   origin: '*', // Autoriser toutes les origines
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
   credentials: true,
   maxAge: 86400 // Cache preflight pour 24 heures
 };
@@ -37,6 +37,15 @@ app.use('/api/posts', postsRoutes);
 // Basic route for testing
 app.get('/', (req, res) => {
   res.send('Microstory Server API is running');
+});
+
+// Ajout d'un endpoint /api pour les tests de connexion
+app.get('/api', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API is running',
+    version: '1.0.0'
+  });
 });
 
 // Route 404 pour les requêtes non trouvées
