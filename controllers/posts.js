@@ -26,19 +26,16 @@ const PostController = {
       
       const posts = Post.getAllPublic(page, limit);
       
-      // Formater les hashtags (stockés sous forme de JSON dans la base)
-      const formattedPosts = posts.map(post => ({
-        ...post,
-        hashtags: post.hashtags ? JSON.parse(post.hashtags) : []
-      }));
+      // Plus besoin de traiter les hashtags comme JSON
+      // Ils sont maintenant stockés comme des chaînes simples
       
       return res.status(200).json({
         success: true,
         data: {
-          posts: formattedPosts,
+          posts: posts, // Désormais les posts ont directement le hashtag sous forme de chaîne
           page,
           limit,
-          hasMore: formattedPosts.length === limit
+          hasMore: posts.length === limit
         }
       });
     } catch (error) {
@@ -78,19 +75,21 @@ const PostController = {
         });
       }
       
-      // Formater les hashtags
-      post.hashtags = post.hashtags ? JSON.parse(post.hashtags) : [];
+      // Plus besoin de parser le hashtag comme JSON
+      // Le hashtag est maintenant une simple chaîne
       
       return res.status(200).json({
         success: true,
-        data: post
+        data: post // Le post contient déjà le hashtag sous forme de chaîne
       });
     } catch (error) {
       console.error('Error in getPostById controller:', error);
+      console.error('Error stack:', error.stack);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch post',
-        error: 'server_error'
+        error: 'server_error',
+        details: error.message
       });
     }
   },
@@ -106,22 +105,21 @@ const PostController = {
       
       const posts = Post.getByUser(userId);
       
-      // Formater les hashtags
-      const formattedPosts = posts.map(post => ({
-        ...post,
-        hashtags: post.hashtags ? JSON.parse(post.hashtags) : []
-      }));
+      // Plus besoin de parser les hashtags
+      // Ils sont maintenant stockés comme des chaînes simples
       
       return res.status(200).json({
         success: true,
-        data: formattedPosts
+        data: posts // Posts avec hashtags sous forme de chaîne simple
       });
     } catch (error) {
       console.error('Error in getUserPosts controller:', error);
+      console.error('Error stack:', error.stack);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch user posts',
-        error: 'server_error'
+        error: 'server_error',
+        details: error.message
       });
     }
   },
@@ -131,13 +129,15 @@ const PostController = {
    * @param {Object} req - Requête Express
    * @param {Object} res - Réponse Express
    */
-  createPost: (req, res) => {
+  createPost: async (req, res) => {
     try {
-      const { type, title, content, hashtags, visibility, ttsInstructions } = req.body;
-      const authorId = req.user.id; // Le middleware d'auth ajoute req.user
+      console.log('🔍 CONTROLLER - Requête de création de post reçue:', req.method, req.originalUrl);
+      console.log('🔍 CONTROLLER - Corps de la requête:', JSON.stringify(req.body, null, 2));
       
-      // Validation basique
-      if (!content || content.trim() === '') {
+      const { type, title, content, hashtags, visibility, ttsInstructions } = req.body;
+      
+      // Validation des données
+      if (!content) {
         return res.status(400).json({
           success: false,
           message: 'Content is required',
@@ -145,36 +145,74 @@ const PostController = {
         });
       }
       
-      // Déterminer automatiquement le type de post si non spécifié
-      let postType = type;
-      if (!postType) {
-        const wordCount = content.split(/\s+/).length;
-        postType = wordCount >= 60 ? 'Post B' : 'Post A';
+      // Déterminer le type de post s'il n'est pas spécifié
+      const postType = type || 'Post A';
+      
+      // Traitement simple du hashtag
+      let singleHashtag = null;
+      
+      // Extrait un seul hashtag, peu importe le format reçu
+      if (hashtags) {
+        if (Array.isArray(hashtags) && hashtags.length > 0) {
+          // Prendre le premier du tableau
+          singleHashtag = hashtags[0].toString();
+        } else if (typeof hashtags === 'string') {
+          // Utiliser la chaîne directement
+          try {
+            // Vérifier si c'est du JSON
+            const parsed = JSON.parse(hashtags);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              singleHashtag = parsed[0].toString();
+            } else {
+              singleHashtag = hashtags;
+            }
+          } catch (e) {
+            // Si ce n'est pas du JSON, utiliser tel quel
+            singleHashtag = hashtags;
+          }
+        }
       }
+      
+      console.log('🔍 CONTROLLER - Hashtag unique extrait:', singleHashtag);
       
       // Créer le post
       const postData = {
-        authorId,
+        authorId: req.user.id,
         type: postType,
-        title,
+        title: title || null,
         content,
-        hashtags,
+        hashtags: singleHashtag, // Désormais un seul hashtag
         visibility: visibility || 'public',
-        ttsInstructions
+        ttsInstructions: ttsInstructions || null
       };
       
-      const newPost = Post.create(postData);
+      console.log('🔍 CONTROLLER - Données post après traitement:', JSON.stringify(postData, null, 2));
       
+      const newPost = await Post.create(postData);
+      
+      if (!newPost) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create post',
+          error: 'creation_failed'
+        });
+      }
+      
+      // Réponse au client
       return res.status(201).json({
         success: true,
+        message: 'Post created successfully',
         data: newPost
       });
     } catch (error) {
-      console.error('Error in createPost controller:', error);
+      console.error('📛 CONTROLLER - Erreur lors de la création du post:', error.message);
+      console.error('📛 CONTROLLER - Stack trace:', error.stack);
+      
       return res.status(500).json({
         success: false,
         message: 'Failed to create post',
-        error: 'server_error'
+        error: 'server_error',
+        details: error.message
       });
     }
   },
@@ -184,11 +222,14 @@ const PostController = {
    * @param {Object} req - Requête Express
    * @param {Object} res - Réponse Express
    */
-  updatePost: (req, res) => {
+  updatePost: async (req, res) => {
     try {
       const postId = req.params.id;
       const { title, content, hashtags, visibility, ttsInstructions } = req.body;
       const userId = req.user.id; // Le middleware d'auth ajoute req.user
+      
+      console.log('updatePost - Request params:', { postId, userId });
+      console.log('updatePost - Request body:', JSON.stringify(req.body, null, 2));
       
       // Vérifier que le post existe
       const post = Post.getById(postId);
@@ -218,11 +259,37 @@ const PostController = {
         });
       }
       
+      // Traitement simplifié du hashtag
+      let singleHashtag = null;
+      
+      if (hashtags) {
+        if (Array.isArray(hashtags) && hashtags.length > 0) {
+          // Prendre juste le premier hashtag du tableau
+          singleHashtag = hashtags[0].toString();
+        } else if (typeof hashtags === 'string') {
+          // Utiliser la chaîne directement
+          singleHashtag = hashtags;
+        } else {
+          // Pour tout autre type, conversion en chaîne
+          singleHashtag = String(hashtags);
+        }
+        
+        // Ajouter # si nécessaire
+        if (singleHashtag && !singleHashtag.startsWith('#')) {
+          singleHashtag = '#' + singleHashtag;
+        }
+      } else if (post.hashtags) {
+        // Garder le hashtag existant si pas de nouveau hashtag fourni
+        singleHashtag = post.hashtags;
+      }
+      
+      console.log('Hashtag unique pour mise à jour:', singleHashtag);
+      
       // Mettre à jour le post
-      const success = Post.update(postId, {
+      const success = await Post.update(postId, {
         title,
         content,
-        hashtags,
+        hashtags: singleHashtag, // Envoyer le hashtag unique au modèle
         visibility,
         ttsInstructions
       });
@@ -237,19 +304,20 @@ const PostController = {
       
       // Récupérer le post mis à jour
       const updatedPost = Post.getById(postId);
-      updatedPost.hashtags = updatedPost.hashtags ? JSON.parse(updatedPost.hashtags) : [];
       
       return res.status(200).json({
         success: true,
-        data: updatedPost,
+        data: updatedPost, // Plus besoin de traitement spécial pour les hashtags
         message: 'Post updated successfully'
       });
     } catch (error) {
       console.error('Error in updatePost controller:', error);
+      console.error('Error stack:', error.stack);
       return res.status(500).json({
         success: false,
         message: 'Failed to update post',
-        error: 'server_error'
+        error: 'server_error',
+        details: error.message
       });
     }
   },
@@ -328,22 +396,21 @@ const PostController = {
       const limit = parseInt(req.query.limit) || 20;
       const posts = Post.search(query, limit);
       
-      // Formater les hashtags
-      const formattedPosts = posts.map(post => ({
-        ...post,
-        hashtags: post.hashtags ? JSON.parse(post.hashtags) : []
-      }));
+      // Plus besoin de parser les hashtags
+      // Ils sont maintenant stockés comme des chaînes simples
       
       return res.status(200).json({
         success: true,
-        data: formattedPosts
+        data: posts
       });
     } catch (error) {
       console.error('Error in searchPosts controller:', error);
+      console.error('Error stack:', error.stack);
       return res.status(500).json({
         success: false,
         message: 'Failed to search posts',
-        error: 'server_error'
+        error: 'server_error',
+        details: error.message
       });
     }
   }

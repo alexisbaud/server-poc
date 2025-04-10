@@ -38,6 +38,9 @@ const authenticateToken = (req, res, next) => {
       algorithms: ['HS256'] // Explicitement spécifier l'algorithme attendu
     });
     
+    console.log('🔍 DEBUG AUTH - Token payload:', JSON.stringify(payload, null, 2));
+    console.log('🔍 DEBUG AUTH - User ID in token:', payload.id, 'type:', typeof payload.id);
+    
     // Vérifier que le payload contient les informations attendues
     if (!payload.id) {
       throw new Error('Invalid token payload');
@@ -49,9 +52,15 @@ const authenticateToken = (req, res, next) => {
     // Also add userId for backward compatibility
     req.userId = payload.id;
     
+    // Conversion explicite de l'ID en nombre
+    if (typeof req.user.id === 'string') {
+      req.user.id = parseInt(req.user.id, 10);
+      console.log('🔍 DEBUG AUTH - Converted string ID to number:', req.user.id, 'type:', typeof req.user.id);
+    }
+    
     next();
   } catch (error) {
-    console.error('Token authentication error:', error);
+    console.error('🔍 DEBUG AUTH - Token authentication error:', error.message);
     
     // Gestion différenciée des erreurs
     if (error.name === 'TokenExpiredError') {

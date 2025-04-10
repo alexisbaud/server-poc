@@ -2,9 +2,6 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Clé secrète pour JWT (à déplacer dans les variables d'environnement en production)
-const JWT_SECRET = 'your-secret-key-here';
-
 /**
  * Validates an email address format
  * @param {string} email - Email to validate
@@ -104,7 +101,7 @@ exports.register = async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { id: newUser.id },
-      JWT_SECRET,
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
     
@@ -177,7 +174,7 @@ exports.login = async (req, res) => {
     // Generate token
     const token = jwt.sign(
       { id: user.id },
-      JWT_SECRET,
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
     

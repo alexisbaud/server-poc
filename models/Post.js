@@ -1,4 +1,5 @@
 const db = require('better-sqlite3')('database.sqlite');
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * Modèle pour les posts.
@@ -76,46 +77,79 @@ const Post = {
   
   /**
    * Crée un nouveau post
-   * @param {Object} postData - Données du post à créer
-   * @returns {Object} Post créé
+   * @param {Object} postData - Données du post
+   * @returns {Object|null} Le post créé ou null en cas d'échec
    */
   create: (postData) => {
     try {
       const { authorId, type, title, content, hashtags, visibility, ttsInstructions } = postData;
       
+      console.log('🔍 MODEL - Création d\'un post avec les données:', JSON.stringify(postData, null, 2));
+      
+      // Validation des données
+      if (!authorId || !type || !content) {
+        console.error('📛 MODEL - Données invalides pour la création d\'un post:', { authorId, type, content });
+        throw new Error('Missing required fields: authorId, type, content');
+      }
+      
+      // Traitement du hashtag unique (plus de tableau/JSON)
+      let singleHashtag = null;
+      
+      // Si hashtags existe dans les données, on prend juste le premier ou la chaîne directement
+      if (hashtags) {
+        if (Array.isArray(hashtags) && hashtags.length > 0) {
+          // Prendre juste le premier hashtag du tableau
+          singleHashtag = hashtags[0].toString();
+        } else if (typeof hashtags === 'string') {
+          // Prendre la chaîne directement
+          singleHashtag = hashtags;
+        } else {
+          // Pour tout autre type, conversion en chaîne
+          singleHashtag = String(hashtags);
+        }
+        
+        // Ajouter # si nécessaire
+        if (singleHashtag && !singleHashtag.startsWith('#')) {
+          singleHashtag = '#' + singleHashtag;
+        }
+      }
+      
+      console.log('🔍 MODEL - Hashtag unique:', singleHashtag);
+      
+      const now = new Date().toISOString();
       const stmt = db.prepare(`
-        INSERT INTO posts (
-          authorId, type, title, content, hashtags, 
-          ttsInstructions, ttsGenerated, createdAt, updatedAt, visibility
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)
+        INSERT INTO posts (authorId, type, title, content, hashtags, ttsInstructions, visibility, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       
-      const hashtagsString = JSON.stringify(hashtags || []);
+      // Exécution de la requête
       const result = stmt.run(
         authorId, 
         type, 
-        title || null, 
+        title === undefined ? null : title, 
         content, 
-        hashtagsString,
-        ttsInstructions || null, 
-        false, 
-        visibility || 'public'
+        singleHashtag, // Désormais une simple chaîne
+        ttsInstructions === undefined ? null : ttsInstructions, 
+        visibility || 'public', 
+        now, 
+        now
       );
       
-      if (result.changes > 0) {
-        return { 
-          id: result.lastInsertRowid, 
-          ...postData, 
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-      } else {
-        throw new Error('Failed to insert post');
+      console.log('🔍 MODEL - Résultat de l\'insertion:', result);
+      
+      if (result.changes === 0) {
+        console.error('📛 MODEL - Échec de l\'insertion du post');
+        return null;
       }
+      
+      const newPost = db.prepare('SELECT * FROM posts WHERE id = ?').get(result.lastInsertRowid);
+      console.log('🔍 MODEL - Nouveau post créé:', JSON.stringify(newPost, null, 2));
+      
+      return newPost;
     } catch (error) {
-      console.error('Error creating post:', error);
-      throw new Error('Failed to create post');
+      console.error('📛 MODEL - Erreur lors de la création du post:', error.message);
+      console.error('📛 MODEL - Stack trace:', error.stack);
+      throw new Error(`Failed to create post: ${error.message}`);
     }
   },
   
@@ -129,6 +163,26 @@ const Post = {
     try {
       const { title, content, hashtags, visibility, ttsInstructions } = postData;
       
+      // Préparation du hashtag unique (comme dans create)
+      let singleHashtag = null;
+      
+      if (hashtags) {
+        if (Array.isArray(hashtags) && hashtags.length > 0) {
+          singleHashtag = hashtags[0].toString();
+        } else if (typeof hashtags === 'string') {
+          singleHashtag = hashtags;
+        } else {
+          singleHashtag = String(hashtags);
+        }
+        
+        // Ajouter # si nécessaire
+        if (singleHashtag && !singleHashtag.startsWith('#')) {
+          singleHashtag = '#' + singleHashtag;
+        }
+      }
+      
+      console.log('🔍 MODEL - Hashtag pour update:', singleHashtag);
+      
       const stmt = db.prepare(`
         UPDATE posts
         SET title = ?, content = ?, hashtags = ?, visibility = ?, 
@@ -136,11 +190,10 @@ const Post = {
         WHERE id = ?
       `);
       
-      const hashtagsString = JSON.stringify(hashtags || []);
       const result = stmt.run(
         title || null,
         content,
-        hashtagsString,
+        singleHashtag, // Utiliser le hashtag comme chaîne simple
         visibility || 'public',
         ttsInstructions || null,
         id
