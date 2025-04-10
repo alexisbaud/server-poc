@@ -14,12 +14,11 @@ const HOST = '0.0.0.0'; // Listen on all network interfaces
 // Middleware
 // Configuration CORS améliorée
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['ms-poc-git-main-alexisbaud104-gmailcoms-projects.vercel.app', 'https://ms-59ju9aysx-alexisbaud104-gmailcoms-projects.vercel.app/', 'https://ms-poc-xi.vercel.app'] 
-    : 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: '*', // Autoriser toutes les origines
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  maxAge: 86400 // Cache preflight pour 24 heures
 };
 app.use(cors(corsOptions));
 app.use(express.json());
