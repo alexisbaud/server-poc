@@ -15,8 +15,8 @@ const HOST = '0.0.0.0'; // Listen on all network interfaces
 // Configuration CORS améliorée
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://votre-app-vercel.vercel.app', 'https://microstory-poc.vercel.app', 'https://ms-poc-xi.vercel.app'] 
-    : 'http://localhost:5173',
+    ? ['ms-poc-git-main-alexisbaud104-gmailcoms-projects.vercel.app', 'https://ms-poc-xi.vercel.app'] 
+    : 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
