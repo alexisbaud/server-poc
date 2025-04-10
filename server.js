@@ -12,7 +12,16 @@ const PORT = process.env.PORT || 3000; // Pour rechercher une chaîne dans le co
 const HOST = '0.0.0.0'; // Listen on all network interfaces
 
 // Middleware
-app.use(cors());
+// Configuration CORS améliorée
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://votre-app-vercel.vercel.app', 'https://microstory-poc.vercel.app', 'https://ms-poc-xi.vercel.app'] 
+    : 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
