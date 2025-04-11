@@ -75,4 +75,13 @@ router.delete('/:id', verifyToken, (req, res) => {
   return PostController.deletePost(req, res);
 });
 
+/**
+ * @route   PUT /api/posts/:id/audio
+ * @desc    Met à jour l'URL audio d'un post
+ * @access  Private (middleware d'auth)
+ */
+router.put('/:id/audio', verifyToken, (req, res) => {
+  return PostController.updatePostAudio(req, res);
+});
+
 module.exports = router; 

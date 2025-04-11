@@ -413,6 +413,62 @@ const PostController = {
         details: error.message
       });
     }
+  },
+  
+  /**
+   * Met à jour l'URL audio d'un post après génération du TTS
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   */
+  updatePostAudio: async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const { audioUrl } = req.body;
+      
+      if (!postId || !audioUrl) {
+        return res.status(400).json({
+          success: false,
+          message: 'Post ID et URL audio sont requis',
+          error: 'missing_parameters'
+        });
+      }
+      
+      console.log(`Mise à jour de l'audio pour le post ${postId} avec l'URL: ${audioUrl}`);
+      
+      // Vérifier que le post existe
+      const post = Post.getById(postId);
+      if (!post) {
+        return res.status(404).json({
+          success: false,
+          message: 'Post non trouvé',
+          error: 'not_found'
+        });
+      }
+      
+      // Mettre à jour l'URL de l'audio
+      const updated = Post.updateTtsStatus(postId, audioUrl);
+      
+      if (!updated) {
+        return res.status(500).json({
+          success: false,
+          message: 'Échec de la mise à jour de l\'audio du post',
+          error: 'update_failed'
+        });
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: 'URL audio du post mise à jour avec succès'
+      });
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'audio du post:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Erreur lors de la mise à jour de l\'audio du post',
+        error: 'server_error',
+        details: error.message
+      });
+    }
   }
 };
 
@@ -424,7 +480,8 @@ console.log('PostController methods:', {
   createPost: typeof PostController.createPost,
   updatePost: typeof PostController.updatePost,
   deletePost: typeof PostController.deletePost,
-  searchPosts: typeof PostController.searchPosts
+  searchPosts: typeof PostController.searchPosts,
+  updatePostAudio: typeof PostController.updatePostAudio
 });
 
 module.exports = PostController; 
