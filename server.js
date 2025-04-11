@@ -1,9 +1,22 @@
-require('dotenv').config();
+// Charger les variables d'environnement en premier
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+// Vérification des variables d'environnement critiques
+const requiredEnvVars = ['OPENAI_API_KEY', 'ELEVENLABS_API_KEY'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error(`ERREUR: Variables d'environnement manquantes: ${missingEnvVars.join(', ')}`);
+  console.error(`Assurez-vous que le fichier .env contient les variables requises.`);
+  // Continuer l'exécution malgré les variables manquantes pour le débogage
+}
+
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const authRoutes = require('./routes/auth');
 const postsRoutes = require('./routes/posts');
+const audioRoutes = require('./routes/audio');
 const { globalLimiter } = require('./middleware/rateLimiter');
 
 // Initialize Express app
@@ -33,19 +46,21 @@ app.use('/audio', express.static(path.join(__dirname, 'audio')));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postsRoutes);
-
-// Basic route for testing
-app.get('/', (req, res) => {
-  res.send('Microstory Server API is running');
-});
+app.use('/api', audioRoutes);
 
 // Ajout d'un endpoint /api pour les tests de connexion
-app.get('/api', (req, res) => {
+// Note: Cette route a été déplacée après le montage des routes d'audio pour éviter les conflits
+app.get('/api/status', (req, res) => {
   res.json({
     success: true,
     message: 'API is running',
     version: '1.0.0'
   });
+});
+
+// Basic route for testing
+app.get('/', (req, res) => {
+  res.send('Microstory Server API is running');
 });
 
 // Route 404 pour les requêtes non trouvées
